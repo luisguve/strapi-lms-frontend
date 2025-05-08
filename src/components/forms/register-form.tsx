@@ -2,15 +2,26 @@ import { useForm, SubmitHandler } from "react-hook-form";
 import Input from "@ui/form-elements/input";
 import Button from "@ui/button";
 import { hasKey } from "@utils/methods";
+import { STRAPI } from "lib/strapi";
+import axios from "axios";
+import { useUser } from "@contexts/user-context";
+import { useState } from "react";
+import FeedbackText from "@ui/form-elements/feedback";
+import { useRouter } from "next/router";
+import Spinner from "@components/ui/spinner";
 
 interface IFormValues {
-    email: string;
+    reg_email: string;
     reg_username: string;
     reg_password: string;
     confirmPassword: string;
 }
 
 const RegisterForm = () => {
+    const router = useRouter();
+    const [isLoading, setIsLoading] = useState(false);
+    const [serverState, setServerState] = useState("");
+    const { setLogin } = useUser();
     const {
         register,
         handleSubmit,
@@ -18,15 +29,58 @@ const RegisterForm = () => {
         getValues,
     } = useForm<IFormValues>();
 
-    const onSubmit: SubmitHandler<IFormValues> = (data) => {
-        // eslint-disable-next-line no-console
-        console.log(data);
+    const onSubmit: SubmitHandler<IFormValues> = async (data) => {
+        try {
+            setIsLoading(true);
+            const response = await axios.post(`${STRAPI}/api/auth/local/register`, {
+                password: data.reg_password,
+                email: data.reg_email,
+                username: data.reg_username
+            });
+            const _data = response.data;
+            const jwt = _data.jwt;
+            setLogin({
+                username: _data.user.username,
+                email: _data.user.email,
+                token: jwt
+            });
+            if (window?.history?.length > 2) {
+                router.back();
+            } else {
+                router.push("/profile");
+            }
+        } catch(err) {
+            setServerState("Email already taken");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
         <div className="tw-px-[50px]">
             <h3 className="tw-text-h2 tw-mb-5">Register</h3>
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
+                <div className="tw-mb-7.5">
+                    <label
+                        htmlFor="reg_username"
+                        className="tw-text-heading tw-text-md"
+                    >
+                        Full name *
+                    </label>
+                    <Input
+                        id="reg_username"
+                        placeholder="Full name"
+                        bg="light"
+                        feedbackText={errors?.reg_username?.message}
+                        state={
+                            hasKey(errors, "reg_username") ? "error" : "success"
+                        }
+                        showState={!!hasKey(errors, "reg_username")}
+                        {...register("reg_username", {
+                            required: "Full name is required",
+                        })}
+                    />
+                </div>
                 <div className="tw-mb-7.5">
                     <label
                         htmlFor="email"
@@ -38,36 +92,16 @@ const RegisterForm = () => {
                         id="email"
                         placeholder="email"
                         bg="light"
-                        feedbackText={errors?.email?.message}
-                        state={hasKey(errors, "email") ? "error" : "success"}
-                        showState={!!hasKey(errors, "email")}
-                        {...register("email", {
+                        feedbackText={errors?.reg_email?.message}
+                        state={hasKey(errors, "reg_email") ? "error" : "success"}
+                        showState={!!hasKey(errors, "reg_email")}
+                        type="email"
+                        {...register("reg_email", {
                             required: "Email is required",
                             pattern: {
                                 value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i,
                                 message: "invalid email address",
                             },
-                        })}
-                    />
-                </div>
-                <div className="tw-mb-7.5">
-                    <label
-                        htmlFor="reg_username"
-                        className="tw-text-heading tw-text-md"
-                    >
-                        Username *
-                    </label>
-                    <Input
-                        id="reg_username"
-                        placeholder="Username"
-                        bg="light"
-                        feedbackText={errors?.reg_username?.message}
-                        state={
-                            hasKey(errors, "reg_username") ? "error" : "success"
-                        }
-                        showState={!!hasKey(errors, "reg_username")}
-                        {...register("reg_username", {
-                            required: "Username is required",
                         })}
                     />
                 </div>
@@ -126,7 +160,13 @@ const RegisterForm = () => {
                 <Button type="submit" fullwidth className="tw-mt-7.5">
                     Register
                 </Button>
+                {serverState && <FeedbackText>{serverState}</FeedbackText>}
             </form>
+            {isLoading && (
+                <div className="tw-fixed tw-bg-light-100/50 tw-top-0 tw-z-50 tw-w-screen tw-h-screen tw-flex tw-justify-center tw-items-center">
+                    <Spinner />
+                </div>
+            )}
         </div>
     );
 };

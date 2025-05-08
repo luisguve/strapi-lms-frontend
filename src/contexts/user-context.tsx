@@ -13,11 +13,20 @@ type CourseType = {
     currentLesson: string;
 };
 
+export interface ILoginData {
+    username: string;
+    email: string;
+    token: string;
+}
+
 //  Context Type
 export type UserContextType = {
     isLoggedIn: boolean | null;
+    username: string;
+    email: string;
+    token: string;
     courseProgress: CourseType[];
-    setLogin: () => void;
+    setLogin: (loginData: ILoginData) => void;
     enrolCourse: (data: { course: string; lessonLink: string }) => void;
     lessonComplete: (data: {
         course: string;
@@ -32,6 +41,9 @@ export const UserContext = createContext({} as UserContextType);
 
 const initialState = {
     isLoggedIn: false,
+    username: '',
+    email: '',
+    token: '',
     courseProgress: [] as CourseType[],
 };
 
@@ -63,10 +75,17 @@ interface UserAction {
 function reducer(state: typeof initialState, action: UserAction) {
     switch (action.type) {
         case "LOGIN": {
-            localStorage.setItem(AUTH_KEY, JSON.stringify(true));
+            localStorage.setItem(AUTH_KEY, JSON.stringify({
+                username: action.payload.username,
+                email: action.payload.email,
+                token: action.payload.token,
+            }));
             return {
                 ...state,
                 isLoggedIn: true,
+                username: action.payload.username,
+                email: action.payload.email,
+                token: action.payload.token,
             };
         }
         case "ENROLL_COURSE": {
@@ -128,9 +147,10 @@ export const UserProvider = ({ children }: TProps) => {
     const value = useMemo(
         () => ({
             ...state,
-            setLogin: () => {
+            setLogin: (data: ILoginData) => {
                 dispatch({
                     type: "LOGIN",
+                    payload: data
                 });
             },
             enrolCourse: (data: { course: string; lessonLink: string }) => {

@@ -7,15 +7,19 @@ import Checkbox from "@ui/form-elements/checkbox";
 import FeedbackText from "@ui/form-elements/feedback";
 import Button from "@ui/button";
 import { hasKey } from "@utils/methods";
+import { STRAPI } from "lib/strapi";
+import axios from "axios";
 import { useUser } from "@contexts/user-context";
+import Spinner from "@components/ui/spinner";
 
 interface IFormValues {
-    username: string;
+    email: string;
     password: string;
 }
 
 const LoginForm = () => {
     const router = useRouter();
+    const [isLoading, setIsLoading] = useState(false);
     const [serverState, setServerState] = useState("");
     const { setLogin } = useUser();
     const {
@@ -24,20 +28,34 @@ const LoginForm = () => {
         formState: { errors },
     } = useForm<IFormValues>({
         defaultValues: {
-            username: "Admin",
-            password: "Admin",
+            email: "",
+            password: "",
         },
     });
 
-    const onSubmit: SubmitHandler<IFormValues> = (data) => {
-        if (data.username === "Admin" && data.password === "Admin") {
-            setLogin();
-            setServerState("");
+    const onSubmit: SubmitHandler<IFormValues> = async (data) => {
+        try {
+            setIsLoading(true);
+            const response = await axios.post(`${STRAPI}/api/auth/local`, {
+                password: data.password,
+                identifier: data.email
+            });
+            const _data = response.data;
+            const jwt = _data.jwt;
+            setLogin({
+                username: _data.user.username,
+                email: _data.user.email,
+                token: jwt
+            });
             if (window?.history?.length > 2) {
                 router.back();
+            } else {
+                router.push("/profile");
             }
-        } else {
-            setServerState("Username or password is incorrect");
+        } catch(err) {
+            setServerState("Email or password is incorrect");
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -47,23 +65,23 @@ const LoginForm = () => {
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
                 <div className="tw-mb-7.5">
                     <label
-                        htmlFor="username"
+                        htmlFor="email"
                         className="tw-text-heading tw-text-md"
                     >
-                        Username *
+                        Email *
                     </label>
                     <Input
-                        id="username"
+                        id="email"
                         placeholder="Username"
                         bg="light"
-                        feedbackText={errors?.username?.message}
-                        state={hasKey(errors, "username") ? "error" : "success"}
-                        showState={!!hasKey(errors, "username")}
-                        {...register("username", {
+                        feedbackText={errors?.email?.message}
+                        state={hasKey(errors, "email") ? "error" : "success"}
+                        showState={!!hasKey(errors, "email")}
+                        type="email"
+                        {...register("email", {
                             required: "Username is required",
                         })}
                     />
-                    <small>Default Username: Admin</small>
                 </div>
                 <div className="tw-mb-7.5">
                     <label
@@ -85,7 +103,6 @@ const LoginForm = () => {
                             required: "Password is required",
                         })}
                     />
-                    <small>Default Password: Admin</small>
                 </div>
                 <Checkbox name="remember" id="remember" label="Remember me" />
                 <Button type="submit" fullwidth className="tw-mt-7.5">
@@ -93,6 +110,11 @@ const LoginForm = () => {
                 </Button>
                 {serverState && <FeedbackText>{serverState}</FeedbackText>}
             </form>
+            {isLoading && (
+                <div className="tw-fixed tw-bg-light-100/50 tw-top-0 tw-z-50 tw-w-screen tw-h-screen tw-flex tw-justify-center tw-items-center">
+                    <Spinner />
+                </div>
+            )}
         </div>
     );
 };
